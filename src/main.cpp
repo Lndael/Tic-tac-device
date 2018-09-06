@@ -205,7 +205,7 @@ void loop()
   {
     disp.point(POINT_OFF);
     disp.displayByte(_b, _A, _N, _G);
-    tone(zipPin, 80, 3000);
+    tone(zipPin, 90, 3000);
     disp.clearDisplay();
     while (true)
     {
