@@ -1,15 +1,17 @@
-#include <AmperkaKB.h>
-#include <cstring>
+#include "AmperkaKB.h"
+#include "TM1637.h"
 // создаём объект для работы с матричной клавиатурой
 // указывая номера arduino подключенные к шлейфу клавиатуры
 // начиная с первого вывода шлейфа
-AmperkaKB KB(16, 5, 4, 0, 14, 12, 13);
+AmperkaKB KB(D0, D1, D2, D3, D4, D5, D6);
 bool masterFlag = 1;
-int ledPin = 15; // адрес светодиода
 char inputChar;
 int disarmPass;
 int disarmTry;
 #define masterPass 5425 // пароль инженерного меню
+#define CLK D7
+#define DIO 3
+TM1637 disp(CLK, DIO);
 
 void setup()
 {
@@ -21,13 +23,14 @@ void setup()
   // время длительного зажатия кнопки
   // по умолчанию 2000, изменим на 5000 мс
   // KB.begin(KB4x3, 5000);
-  pinMode(ledPin, OUTPUT);
-  digitalWrite(ledPin, LOW);
+  disp.init();
+  disp.set(4);
 }
 
 int enterCode() // возвращает веденный код с клавиатуры
 {
-  Serial.println("Enter code");
+  Serial.println("enter PASS");
+  disp.displayByte(_P, _A, _S, _S);
   boolean i = true;
   char keyPressed;
   int intKeyPressed;
@@ -43,7 +46,11 @@ int enterCode() // возвращает веденный код с клавиа�
       switch (keyPressed)
       {
       case '*':
+        disp.clearDisplay();
+        disp.displayInt(code);
+        delay(3000);
         i = false;
+        return code;
         break;
       case '#':
         code = 0;
@@ -53,7 +60,6 @@ int enterCode() // возвращает веденный код с клавиа�
       }
     }
   }
-  return code;
 }
 
 void setDisarmPass() // устанавливает пароль на обезвреживание
@@ -67,7 +73,20 @@ bool checkMasterPass() // проверка мастер-пароля
   Serial.println("Check master pass");
   if (enterCode() == masterPass)
   {
+    disp.displayByte(_G, _0, _0, _d);
+    delay(1000);
+    disp.clearDisplay();
     return true;
+  }
+  else
+  {
+    while (true)
+    {
+      int8_t text[] = {_b, _A, _d, _empty, _A, _d, _empty, _P, _A, _S, _S, _empty};
+      disp.runningString(text, 12, 300);
+      delay(500);
+      yield();
+    }
   }
 }
 
@@ -81,10 +100,8 @@ void loop()
     {
       while (true)
       {
-        digitalWrite(ledPin, HIGH);
-        delay(1000);
-        digitalWrite(ledPin, LOW);
-        delay(1000);
+        int8_t welcome_banner[] = {_b, _A, _d, _empty, _P, _A, _S, _S, _empty};
+        disp.runningString(welcome_banner, 9, 300);
         yield();
       }
     }
@@ -95,9 +112,8 @@ void loop()
     {
       while (true)
       {
-        digitalWrite(ledPin, HIGH);
-        delay(100);
-        digitalWrite(ledPin, LOW);
+        int8_t text[] = {_G, _r, _E, _A, _t, _empty};
+        disp.runningString(text, 6, 300);
         delay(100);
         yield();
       }
@@ -107,7 +123,7 @@ void loop()
   {
     while (true)
     {
-      digitalWrite(ledPin, HIGH);
+      disp.displayByte(_b, _A, _N, _G);
       yield();
     }
   }
