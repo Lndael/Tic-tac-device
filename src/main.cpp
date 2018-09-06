@@ -16,7 +16,7 @@ int minutes, seconds, milseconds;
 #define masterPass 5425 // пароль инженерного меню
 #define CLK 16
 #define DIO 5
-#define relayPin D8
+#define zipPin D8
 TM1637 disp(CLK, DIO);
 int timeShift;
 int stop_m_f;
@@ -34,7 +34,7 @@ void setup()
   // KB.begin(KB4x3, 5000);
   disp.init();
   disp.set(7);
-  pinMode(relayPin, OUTPUT);
+  pinMode(zipPin, OUTPUT);
   start_f = 1;
   masterFlag = 1;
 }
@@ -90,12 +90,14 @@ int enterCode() // возвращает веденный код с клавиа�
       switch (keyPressed)
       {
       case '*':
+        delay(50);
         i = false;
         break;
       case '#':
         inputCode = 0;
         break;
       default:
+        delay(50);
         intKeyPressed = keyPressed - '0';
         inputCode = inputCode * 10 + intKeyPressed;
         Serial.println(inputCode);
@@ -109,7 +111,6 @@ int enterCode() // возвращает веденный код с клавиа�
 
 void time_ent()
 {
-  masterFlag = 3;
   disp.point(POINT_ON); //включить двоеточие
   int time_str;
   time_str = enterCode();
@@ -121,23 +122,20 @@ void time_ent()
     seconds = 59;
   }
   milseconds = 0;
-  masterFlag = 0;
-  stop_m_f = 1;
   last_time = millis();
   disp.point(POINT_OFF);
 }
 
 void setDisarmPass() // устанавливает пароль на обезвреживание
 {
-  disp.displayByte(_D, _A, _P, _S);
-  masterFlag = 2;
+  disp.displayByte(_d, _A, _P, _S);
   disarmPass = enterCode();
   disp.clearDisplay();
-}
+  }
 
 bool checkMasterPass() // проверка мастер-пароля
 {
-  disp.displayByte(_A, _D, _P, _S);
+  disp.displayByte(_A, _d, _P, _S);
   Serial.println("Check master pass");
   if (enterCode() == masterPass)
   {
@@ -163,6 +161,7 @@ void loop()
 {
   if (masterFlag == 1)
   {
+    masterFlag = 0;
     if (checkMasterPass() == 1)
     {
       setDisarmPass();
@@ -172,8 +171,7 @@ void loop()
     {
       while (true)
       {
-        int8_t welcome_banner[] = {_b, _A, _d, _empty, _P,
-                                   _A, _S, _S, _empty};
+        int8_t welcome_banner[] = {_b, _A, _d, _empty, _P, _A, _S, _S, _empty};
         disp.runningString(welcome_banner, 9, 300);
         yield();
       }
@@ -195,7 +193,7 @@ void loop()
           yield();
         }
       }
-    disp.clearDisplay();
+      disp.clearDisplay();
     }
   }
   get_time();
@@ -205,10 +203,12 @@ void loop()
   disp.display(3, seconds % 10);
   if (minutes == 0 && seconds == 0)
   {
+    disp.point(POINT_OFF);
+    disp.displayByte(_b, _A, _N, _G);
+    tone(zipPin, 80, 3000);
+    disp.clearDisplay();
     while (true)
     {
-      disp.displayByte(_b, _A, _N, _G);
-
       yield();
     }
   }
