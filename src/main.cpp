@@ -184,17 +184,18 @@ void loop()
   {
     if (KB.getChar == '#')
     {
+      disp.displayByte(_C, _O, _d, _E);
       if (enterCode() == disarmPass)
       {
         while (true)
         {
           int8_t text[] = {_G, _r, _E, _A, _t, _empty};
           disp.runningString(text, 6, 300);
-
           delay(100);
           yield();
         }
       }
+    disp.clearDisplay();
     }
   }
   get_time();
