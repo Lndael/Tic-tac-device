@@ -1,17 +1,25 @@
-#include "AmperkaKB.h"
 #include "TM1637.h"
+#include <AmperkaKB.h>
+
 // создаём объект для работы с матричной клавиатурой
 // указывая номера arduino подключенные к шлейфу клавиатуры
 // начиная с первого вывода шлейфа
-AmperkaKB KB(D0, D1, D2, D3, D4, D5, D6);
-bool masterFlag = 1;
+AmperkaKB KB(4, 0, 2, 14, 12, 13, 3);
+int masterFlag = 1;
 char inputChar;
 int disarmPass;
 int disarmTry;
+unsigned long last_time, def_time;
+boolean initial, initial2, pass_ent_f, time_ent_f, stopw_m_f, def_f,
+    button_flag;
+int minutes, seconds, milseconds;
 #define masterPass 5425 // пароль инженерного меню
-#define CLK D7
-#define DIO 3
+#define CLK 16
+#define DIO 5
+#define relayPin D8
 TM1637 disp(CLK, DIO);
+int timeShift;
+int stop_m_f;
 
 void setup()
 {
@@ -24,21 +32,75 @@ void setup()
   // по умолчанию 2000, изменим на 5000 мс
   // KB.begin(KB4x3, 5000);
   disp.init();
-  disp.set(4);
+  disp.set(7);
+  pinMode(relayPin, OUTPUT);
+}
+
+void get_time()
+{ //функция таймера обратного отсчёта
+  Serial.println("timer");
+  if (millis() - last_time >= 500)
+  {
+    last_time = millis();
+    milseconds++;
+    if (milseconds == 1)
+    {
+      disp.point(POINT_OFF);
+    }
+    else
+    {
+      disp.point(POINT_ON);
+    }
+    if (milseconds >= 2)
+    {
+      milseconds = 0;
+      seconds--;
+      if (seconds < 0)
+      {
+        seconds = 59;
+        minutes--;
+      }
+    }
+  }
 }
 
 int enterCode() // возвращает веденный код с клавиатуры
 {
   Serial.println("enter PASS");
-  disp.displayByte(_P, _A, _S, _S);
+  if (masterFlag == 1)
+  {
+    disp.displayByte(_A, _d, _P, _5);
+  }
+  if (masterFlag == 2)
+  {
+    disp.displayByte(_d, _A, _P, _S);
+  }
+  if (masterFlag == 3)
+  {
+    disp.displayByte(_C, _L, _O, _C);
+  }
   boolean i = true;
   char keyPressed;
   int intKeyPressed;
-  int code;
+  int inputCode = 0;
   while (i == true)
   {
+    if (masterFlag == 0)
+    {
+      get_time();
+    }
+    Serial.println(millis());
+    if (masterFlag == 0)
+    {
+      disp.display(0, minutes / 10);
+      disp.display(1, minutes % 10);
+      disp.display(2, seconds / 10);
+      disp.display(3, seconds % 10);
+    }
     keyPressed = '0';
     yield();
+    Serial.println(minutes);
+    Serial.println(seconds);
     KB.read();
     if (KB.justPressed())
     {
@@ -46,85 +108,112 @@ int enterCode() // возвращает веденный код с клавиа�
       switch (keyPressed)
       {
       case '*':
-        disp.clearDisplay();
-        disp.displayInt(code);
-        delay(3000);
         i = false;
-        return code;
         break;
       case '#':
-        code = 0;
+        inputCode = 0;
+        break;
       default:
         intKeyPressed = keyPressed - '0';
-        code = code * 10 + intKeyPressed;
-      }
+        inputCode = inputCode * 10 + intKeyPressed;
+        Serial.println(inputCode);
+        disp.clearDisplay();
+        disp.displayInt(inputCode);
+          }
     }
+    return inputCode;
   }
 }
-
-void setDisarmPass() // устанавливает пароль на обезвреживание
-{
-  disarmPass = enterCode();
-  masterFlag = 0;
-}
-
-bool checkMasterPass() // проверка мастер-пароля
-{
-  Serial.println("Check master pass");
-  if (enterCode() == masterPass)
+  void time_ent()
   {
-    disp.displayByte(_G, _0, _0, _d);
-    delay(1000);
-    disp.clearDisplay();
-    return true;
-  }
-  else
-  {
-    while (true)
+    disp.point(POINT_ON); //включить двоеточие
+    int time_str;
+    time_str = enterCode();
+    minutes = ((time_str - time_str % 100) /
+               100); //разбиение введенного числа на минуты и секунды
+    seconds = (time_str % 100);
+    if (seconds > 59)
     {
-      int8_t text[] = {_b, _A, _d, _empty, _A, _d, _empty, _P, _A, _S, _S, _empty};
-      disp.runningString(text, 12, 300);
-      delay(500);
-      yield();
+      seconds = 59;
     }
+    milseconds = 0;
+    masterFlag = 0;
+    stop_m_f = 1;
+    last_time = millis();
   }
-}
 
-void loop()
-{
-  if (masterFlag == 1)
+  void setDisarmPass() // устанавливает пароль на обезвреживание
   {
-    if (checkMasterPass() == 1)
-      setDisarmPass();
+    masterFlag = 2;
+    disarmPass = enterCode();
+    masterFlag = 3;
+  }
+
+  bool checkMasterPass() // проверка мастер-пароля
+  {
+    Serial.println("Check master pass");
+    if (enterCode() == masterPass)
+    {
+      disp.displayByte(_G, _0, _0, _d);
+      delay(1000);
+      disp.clearDisplay();
+      return true;
+    }
     else
     {
       while (true)
       {
-        int8_t welcome_banner[] = {_b, _A, _d, _empty, _P, _A, _S, _S, _empty};
-        disp.runningString(welcome_banner, 9, 300);
+        int8_t text[] = {_b, _A, _d, _empty, _A, _d,
+                         _empty, _P, _A, _S, _S, _empty};
+        disp.runningString(text, 12, 300);
+        delay(500);
         yield();
       }
     }
   }
 
-  if (enterCode() == disarmPass)
+  void loop()
   {
+    if (masterFlag == 1)
     {
-      while (true)
+      if (checkMasterPass() == 1)
       {
-        int8_t text[] = {_G, _r, _E, _A, _t, _empty};
-        disp.runningString(text, 6, 300);
-        delay(100);
-        yield();
+        setDisarmPass();
+        time_ent();
+      }
+      else
+      {
+        while (true)
+        {
+          int8_t welcome_banner[] = {_b, _A, _d, _empty, _P,
+                                     _A, _S, _S, _empty};
+          disp.runningString(welcome_banner, 9, 300);
+          yield();
+        }
       }
     }
-  }
-  else
-  {
+    if (enterCode() == disarmPass)
+    {
+      {
+        while (true)
+        {
+          int8_t text[] = {_G, _r, _E, _A, _t, _empty};
+          disp.runningString(text, 6, 300);
+          stop_m_f = 0;
+          delay(100);
+          yield();
+        }
+      }
+    }
+    /* {
+    digitalWrite(relayPin, HIGH);
+    // delay(2000);
+    // digitalWrite(relayPin, LOW);
     while (true)
     {
       disp.displayByte(_b, _A, _N, _G);
+      stop_m_f = 0;
       yield();
     }
+  } */
   }
-}
