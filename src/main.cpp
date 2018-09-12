@@ -54,6 +54,10 @@ void get_time()
     if (milseconds == 1)
     {
       disp.point(POINT_OFF);
+      if (minutes == 0 && seconds < 10)
+      {
+        tone(zipPin, 4000, 100);
+      }
     }
     else
     {
@@ -63,6 +67,7 @@ void get_time()
     {
       milseconds = 0;
       seconds--;
+      tone(zipPin, 4000, 100);
       if (seconds < 0)
       {
         seconds = 59;
@@ -131,7 +136,7 @@ void setDisarmPass() // устанавливает пароль на обезв�
   disp.displayByte(_d, _A, _P, _S);
   disarmPass = enterCode();
   disp.clearDisplay();
-  }
+}
 
 bool checkMasterPass() // проверка мастер-пароля
 {
@@ -205,7 +210,7 @@ void loop()
   {
     disp.point(POINT_OFF);
     disp.displayByte(_b, _A, _N, _G);
-    tone(zipPin, 90, 3000);
+    tone(zipPin, 50, 3000);
     disp.clearDisplay();
     while (true)
     {
